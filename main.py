@@ -410,6 +410,12 @@ elif FLAGS.mode == 'freeze':
     inputs_raw = tf.placeholder(tf.float32, shape=[1, None, None, 3], name='inputs_raw')
     path_LR = tf.placeholder(tf.string, shape=[], name='path_LR')
 
+    # Convert the images output from the network
+    with tf.name_scope('convert_image'):
+        # Deprocess the images outputed from the model
+        inputs = deprocessLR(inputs_raw)
+        # Convert back to uint8
+        converted_inputs = tf.image.convert_image_dtype(inputs, dtype=tf.uint8, saturate=True)
 
     with tf.variable_scope('generator'):
         if FLAGS.task == 'SRGAN' or FLAGS.task == 'SRResnet':
@@ -448,19 +454,20 @@ elif FLAGS.mode == 'prod':
         graph_def = tf.compat.v1.GraphDef()
         graph_def.ParseFromString(f.read())
 
-    nodes = [n.name + ' => ' +  n.op for n in graph_def.node if n.op in ('Placeholder')]
+    nodes = [n.name + ' => ' +  n.op for n in graph_def.node if n.op in ('Placeholder') or n.op == 'BiasAdd']
     for node in nodes:
         print(node)
 
     with sess.graph.as_default():
         # Define input tensor
         input_raw = tf.compat.v1.placeholder(np.float32, shape = [1, None, None, 3], name='inputs_raw')
-        
-        tf.import_graph_def(graph_def)
+        # took me too long to realize the map is 'graph_input_node_name': input_raw object
+        tf.import_graph_def(graph_def, {'inputs_raw': input_raw})
 
     sess.graph.finalize()
     
-    output_tensor = graph.get_tensor_by_name(FLAGS.output_node_name + ':0')
+    output_tensor = tf.get_default_graph().get_tensor_by_name(FLAGS.output_node_name + ':0')
+    print(output_tensor)
     output = sess.run(output_tensor, feed_dict = {self.input: FLAGS.input_dir_LR + '/' + FLAGS.test_image_name, self.dropout_rate: 0})
 
     io.imshow(output)
