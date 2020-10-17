@@ -7,7 +7,7 @@ from lib.ops import *
 import collections
 import os
 import math
-import scipy.misc as sic
+import imageio
 import numpy as np
 
 
@@ -153,7 +153,8 @@ def test_data_loader(FLAGS):
 
     # Read in and preprocess the images
     def preprocess_test(name, mode):
-        im = sic.imread(name, mode="RGB").astype(np.float32)
+        #im = sic.imread(name, mode="RGB").astype(np.float32)
+        im = imageio.imread(name).astype(np.float32)
         # check grayscale image
         if im.shape[-1] != 3:
             h, w = im.shape
@@ -196,7 +197,7 @@ def inference_data_loader(FLAGS):
 
     # Read in and preprocess the images
     def preprocess_test(name):
-        im = sic.imread(name, mode="RGB").astype(np.float32)
+        im = imageio.imread(name).astype(np.float32)
         # check grayscale image
         if im.shape[-1] != 3:
             h, w = im.shape
@@ -332,7 +333,8 @@ def discriminator(dis_inputs, FLAGS=None):
 def VGG19_slim(input, type, reuse, scope):
     # Define the feature to extract according to the type of perceptual
     if type == 'VGG54':
-        target_layer = scope + 'vgg_19/conv5/conv5_4'
+        #target_layer = scope + 'vgg_19/conv5/conv5_4'
+        target_layer = 'vgg_19/conv5/conv5_4'
     elif type == 'VGG22':
         target_layer = scope + 'vgg_19/conv2/conv2_2'
     else:

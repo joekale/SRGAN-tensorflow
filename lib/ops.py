@@ -4,8 +4,9 @@ from __future__ import print_function
 
 
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+import tf_slim as slim
 import pdb
+import keras
 
 
 def preprocess(image):

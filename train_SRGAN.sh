@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-CUDA_VISIBLE_DEVICES=0 python main.py \
+CUDA_VISIBLE_DEVICES=0 python3 main.py \
     --output_dir ./experiment_SRGAN_VGG54/ \
     --summary_dir ./experiment_SRGAN_VGG54/log/ \
     --mode train \
@@ -25,5 +25,5 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
     --queue_thread 10 \
     --vgg_scaling 0.0061 \
     --pre_trained_model True \
-    --checkpoint ./experiment_SRGAN_MSE/model-500000
+    --checkpoint ./SRGAN_pre-trained/model-200000
 

@@ -3,13 +3,15 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
+import tf_slim as slim
 import os
 from lib.model import data_loader, generator, SRGAN, test_data_loader, inference_data_loader, save_images, SRResnet
 from lib.ops import *
 import math
 import time
 import numpy as np
+
+print(tf.version)
 
 Flags = tf.app.flags
 
@@ -29,6 +31,9 @@ Flags.DEFINE_string('task', None, 'The task: SRGAN, SRResnet')
 Flags.DEFINE_integer('batch_size', 16, 'Batch size of the input batch')
 Flags.DEFINE_string('input_dir_LR', None, 'The directory of the input resolution input data')
 Flags.DEFINE_string('input_dir_HR', None, 'The directory of the high resolution input data')
+Flags.DEFINE_string('frozen_graph_name', None, 'The base name to use for the frozen graph file names')
+Flags.DEFINE_string('output_node_name', None, 'The output node name of the generator for freezing')
+Flags.DEFINE_string('test_image_name', None, 'The image to test with from input_dir_LR. For prod mode only.')
 Flags.DEFINE_boolean('flip', True, 'Whether random flip data augmentation is applied')
 Flags.DEFINE_boolean('random_crop', True, 'Whether perform the random crop')
 Flags.DEFINE_integer('crop_size', 24, 'The crop size of the training image')
@@ -388,9 +393,74 @@ elif FLAGS.mode == 'train':
         print('Optimization done!!!!!!!!!!!!')
 
 
+# The export mode
+elif FLAGS.mode == 'freeze':
+    from tensorflow.python.tools import freeze_graph
+    # Check the checkpoint
+    if FLAGS.checkpoint is None:
+        raise ValueError('The checkpoint file is needed to performing the test.')
+
+    # In the testing time, no flip and crop is needed
+    if FLAGS.flip == True:
+        FLAGS.flip = False
+
+    if FLAGS.crop_size is not None:
+        FLAGS.crop_size = None
+    
+    inputs_raw = tf.placeholder(tf.float32, shape=[1, None, None, 3], name='inputs_raw')
+    path_LR = tf.placeholder(tf.string, shape=[], name='path_LR')
 
 
+    with tf.variable_scope('generator'):
+        if FLAGS.task == 'SRGAN' or FLAGS.task == 'SRResnet':
+            gen_output = generator(inputs_raw, 3, reuse=False, FLAGS=FLAGS)
+        else:
+            raise NotImplementedError('Unknown task!!')
 
+    # Define the weight initiallizer (In inference time, we only need to restore the weight of the generator)
+    var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
+    weight_initiallizer = tf.train.Saver(var_list)
 
+    # Define the initialization operation
+    init_op = tf.global_variables_initializer()
 
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as sess:
+        # Load the pretrained model
+        print('Loading weights from the pre-trained model')
+        weight_initiallizer.restore(sess, FLAGS.checkpoint)
+        print('Writing graph')
+        tf.io.write_graph(sess.graph.as_graph_def(),".", FLAGS.frozen_graph_name + '.pbtxt',
+                as_text=True)
+        print('freezing generator graph')
+        #freeze_graph.freeze_graph('srgan.pbtxt', "", False, FLAGS.checkpoint, "generator/generator_unit/output_stage/conv/Conv/BiasAdd", "save/restore_all", "save/Const:0", 'frozen-' + FLAGS.frozen_graph_name + '.pb', True, "")
 
+        freeze_graph.freeze_graph(FLAGS.frozen_graph_name + '.pbtxt', "", False, FLAGS.checkpoint, FLAGS.output_node_name , "unused", "unused", FLAGS.frozen_graph_name + '.pb', True, "")
+
+elif FLAGS.mode == 'prod':
+    import imageio as io
+    tf.compat.v1.reset_default_graph()
+
+    graph = tf.Graph()
+    sess = tf.compat.v1.Session(graph = graph)
+    with tf.io.gfile.GFile(FLAGS.frozen_graph_name + '.pb', 'rb') as f:
+        graph_def = tf.compat.v1.GraphDef()
+        graph_def.ParseFromString(f.read())
+
+    nodes = [n.name + ' => ' +  n.op for n in graph_def.node if n.op in ('Placeholder')]
+    for node in nodes:
+        print(node)
+
+    with sess.graph.as_default():
+        # Define input tensor
+        input_raw = tf.compat.v1.placeholder(np.float32, shape = [1, None, None, 3], name='inputs_raw')
+        
+        tf.import_graph_def(graph_def)
+
+    sess.graph.finalize()
+    
+    output_tensor = graph.get_tensor_by_name(FLAGS.output_node_name + ':0')
+    output = sess.run(output_tensor, feed_dict = {self.input: FLAGS.input_dir_LR + '/' + FLAGS.test_image_name, self.dropout_rate: 0})
+
+    io.imshow(output)
