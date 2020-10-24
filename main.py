@@ -481,10 +481,22 @@ elif FLAGS.mode == 'prod':
     
     sess.graph.finalize()
     
-    test_im_path = os.path.abspath(FLAGS.input_dir_LR + '/' + FLAGS.test_image_name)
-    test_im = io.imread(test_im_path)
-    output = sess.run(save_fetch, feed_dict={'inputs_raw:0': np.array([test_im]).astype(np.float32), path_LR: FLAGS.input_dir_LR})
-    filesets = save_images(output, FLAGS)
-    print(filesets)
+    # Declare the test data reader
+    inference_data = inference_data_loader(FLAGS)
+
+    #test_im_path = os.path.abspath(FLAGS.input_dir_LR + '/' + FLAGS.test_image_name)
+    #test_im = io.imread(test_im_path)
+    #output = sess.run(save_fetch, feed_dict={'inputs_raw:0': np.array([test_im]).astype(np.float32), path_LR: FLAGS.input_dir_LR})
+    #filesets = save_images(output, FLAGS)
+    #print(filesets)
+    max_iter = len(inference_data.inputs)
+    print('Evaluation starts!!')
+    for i in range(max_iter):
+        input_im = np.array([inference_data.inputs[i]]).astype(np.float32)
+        path_lr = inference_data.paths_LR[i]
+        results = sess.run(save_fetch, feed_dict={'inputs_raw:0': input_im, path_LR: path_lr})
+        filesets = save_images(results, FLAGS)
+        for i, f in enumerate(filesets):
+            print('evaluate image', f['name'])
 
 
