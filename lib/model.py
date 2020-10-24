@@ -538,7 +538,7 @@ def save_images(fetches, FLAGS, step=None):
     name, _ = os.path.splitext(os.path.basename(str(in_path)))
     fileset = {"name": name, "step": step}
 
-    if FLAGS.mode == 'inference':
+    if FLAGS.mode == 'inference' or FLAGS.mode == 'prod':
         kind = "outputs"
         filename = name + ".png"
         if step is not None:

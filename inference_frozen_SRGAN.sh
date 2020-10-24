@@ -12,4 +12,4 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
     --checkpoint ./experiment_SRGAN_VGG54/model-90000 \
     --frozen_graph_name frozen-srgan \
     --output_node_name generator/generator_unit/output_stage/conv/Conv/BiasAdd \
-    --test_image_name image_005.png
+    --test_image_name img_005.png

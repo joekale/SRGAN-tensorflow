@@ -461,13 +461,30 @@ elif FLAGS.mode == 'prod':
     with sess.graph.as_default():
         # Define input tensor
         input_raw = tf.compat.v1.placeholder(np.float32, shape = [1, None, None, 3], name='inputs_raw')
+        path_LR = tf.compat.v1.placeholder(tf.string, shape=[], name='path_LR')
         # took me too long to realize the map is 'graph_input_node_name': input_raw object
-        tf.import_graph_def(graph_def, {'inputs_raw': input_raw})
+        graph_string = tf.import_graph_def(graph_def, {'inputs_raw': input_raw}, {FLAGS.output_node_name})
+        print(graph_string[0].outputs)
+        gen_output = sess.graph.get_tensor_by_name("import/" + FLAGS.output_node_name + ':0')
+        outputs = deprocess(gen_output)
 
+        # Convert back to uint8
+        converted_inputs = tf.image.convert_image_dtype(input_raw, dtype=tf.uint8, saturate=True)
+        converted_outputs = tf.image.convert_image_dtype(outputs, dtype=tf.uint8, saturate=True)
+
+    with tf.name_scope('encode_image'):
+        save_fetch = {
+            "path_LR": path_LR,
+            "inputs": tf.map_fn(tf.image.encode_png, converted_inputs, dtype=tf.string, name='input_pngs'),
+            "outputs": tf.map_fn(tf.image.encode_png, converted_outputs, dtype=tf.string, name='output_pngs')
+        }
+    
     sess.graph.finalize()
     
-    output_tensor = tf.get_default_graph().get_tensor_by_name(FLAGS.output_node_name + ':0')
-    print(output_tensor)
-    output = sess.run(output_tensor, feed_dict = {self.input: FLAGS.input_dir_LR + '/' + FLAGS.test_image_name, self.dropout_rate: 0})
+    test_im_path = os.path.abspath(FLAGS.input_dir_LR + '/' + FLAGS.test_image_name)
+    test_im = io.imread(test_im_path)
+    output = sess.run(save_fetch, feed_dict={'inputs_raw:0': np.array([test_im]).astype(np.float32), path_LR: FLAGS.input_dir_LR})
+    filesets = save_images(output, FLAGS)
+    print(filesets)
 
-    io.imshow(output)
+
